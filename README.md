@@ -97,7 +97,13 @@ Response:
 
 ## Local Runbook
 
-Requires Bun.
+Detailed setup guides:
+
+- [Local setup](docs/local-setup.md)
+- [Docker setup](docs/docker.md)
+- [Vercel hosting](docs/vercel.md)
+
+Quick start with Bun:
 
 ```bash
 bun install

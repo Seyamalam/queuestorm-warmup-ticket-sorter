@@ -1,0 +1,11 @@
+.git
+.github
+.vercel
+node_modules
+*.log
+.env
+.env.*
+!.env.example
+README.md
+docs
+src/**/*.test.ts
