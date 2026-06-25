@@ -64,7 +64,7 @@ The Python standard-library comparison server showed errors at this stress level
 
 ### Combined Workload Averages
 
-These numbers average all four local benchmark workloads together: `health-routing`, `ticket-classify`, `json-shape`, and `cpu-checksum`. Actix Web is included in the benchmark suite, but it is not in this local table because crates.io timed out while downloading its dependencies on this machine.
+These numbers average all four local benchmark workloads together: `health-routing`, `ticket-classify`, `json-shape`, and `cpu-checksum`. Actix Web is also included in the benchmark suite; if dependency fetching is slow, the repository includes Cargo sparse-registry config under `.cargo/config.toml`.
 
 Command:
 
