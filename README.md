@@ -80,6 +80,22 @@ IMPLEMENTATIONS=bun-hono,rust-axum,go-stdlib,node-express,python-stdlib REQUESTS
 | Node.js + Express | 4 | 2,000 | 2,000 | 0 | 16,970.2 | +41.0% | -18.1% | 5.36 ms | 10.42 ms | 11.58 ms | 152.3 MB |
 | Python stdlib | 4 | 2,000 | 1,972 | 28 | 2,214.3 | -81.6% | -87.0% | 224.89 ms | 2,147.23 ms | 2,240.71 ms | 23.9 MB |
 
+### Result Summary
+
+- **Best overall local throughput:** Go stdlib and Rust Axum are the fastest in the combined workload average. Go leads slightly on average RPS, while Rust Axum has much lower peak RSS.
+- **Best memory footprint:** Rust Axum is the clear winner in this local run, peaking at 7.1 MB across the combined workloads.
+- **Best CPU-bound behavior:** Rust and Go pull far ahead on `cpu-checksum`, which is expected because the workload is dominated by tight string/number loops rather than framework routing.
+- **Best JavaScript comparison:** Node.js + Express beats Bun + Hono on average RPS in this synthetic local run, but uses much more memory. The deployed app remains Bun + Hono because it is simpler for this project, fast enough, and already fits the Vercel workflow.
+- **Python stdlib limitation:** The Python comparison is intentionally dependency-free and uses `ThreadingHTTPServer`, which is not a production high-concurrency server. Its tail latency and errors under stress show why a real Python deployment would use something like Uvicorn, Granian, or another production ASGI/WSGI server.
+- **What this means for the hackathon:** Bun + Hono is more than fast enough for the required API. The comparison implementations are useful learning artifacts, but they are not needed for the deployed submission.
+
+Benchmark caveats:
+
+- Results are local synthetic numbers, not public Vercel capacity.
+- The benchmark client is Node `fetch`, so client-side limits can influence very high-load runs.
+- Memory is sampled from local process RSS and should be treated as approximate.
+- Cross-runtime comparisons are directional; framework defaults, compiler warmup, GC behavior, and OS scheduling can change the exact numbers.
+
 ## Security
 
 - No secrets are stored in the repository.
