@@ -31,6 +31,14 @@ const implementations = [
     cwd: new URL('../go-version/', import.meta.url).pathname,
     env: {},
   },
+  {
+    name: 'python-stdlib',
+    port: 3003,
+    command: 'python3',
+    args: ['main.py'],
+    cwd: new URL('../python-version/', import.meta.url).pathname,
+    env: {},
+  },
 ]
 
 const sampleTickets = [
