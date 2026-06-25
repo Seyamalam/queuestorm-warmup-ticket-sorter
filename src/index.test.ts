@@ -249,6 +249,40 @@ describe('HTTP contract', () => {
     expect(limited.headers.get('retry-after')).not.toBeNull()
     expect(await limited.json()).toEqual({ error: 'Too many requests.' })
   })
+
+  it('serves benchmark-only JSON and CPU routes', async () => {
+    const jsonResponse = await app.fetch(
+      new Request('http://localhost/bench/json', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          items: [
+            { amount: 10.25, label: 'alpha', active: true },
+            { amount: 20.5, label: 'beta', active: false },
+          ],
+        }),
+      })
+    )
+    expect(jsonResponse.status).toBe(200)
+    expect(await jsonResponse.json()).toMatchObject({
+      item_count: 2,
+      active_count: 1,
+      amount_total: 30.75,
+    })
+
+    const cpuResponse = await app.fetch(
+      new Request('http://localhost/bench/cpu', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ text: 'QueueStorm', rounds: 10 }),
+      })
+    )
+    expect(cpuResponse.status).toBe(200)
+    const body = await cpuResponse.json()
+    expect(body.bytes).toBe(10)
+    expect(body.rounds).toBe(10)
+    expect(typeof body.checksum).toBe('number')
+  })
 })
 
 describe('classification requirements', () => {

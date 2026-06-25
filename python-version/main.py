@@ -152,7 +152,7 @@ class Handler(BaseHTTPRequestHandler):
         self.write_json(404, {"error": "Not found."})
 
     def do_POST(self) -> None:
-        if self.path != "/sort-ticket":
+        if self.path not in {"/sort-ticket", "/bench/json", "/bench/cpu"}:
             self.write_json(404, {"error": "Not found."})
             return
 
@@ -166,6 +166,18 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(raw_body)
         except Exception:
             self.write_json(400, {"error": "Request body must be valid JSON."})
+            return
+
+        if self.path == "/bench/json":
+            self.write_json(200, bench_json(body))
+            return
+
+        if self.path == "/bench/cpu":
+            text = body.get("text", "") if isinstance(body, dict) else ""
+            rounds = body.get("rounds", 1000) if isinstance(body, dict) else 1000
+            text = text if isinstance(text, str) else ""
+            rounds = max(1, min(10_000, rounds if isinstance(rounds, int | float) else 1000))
+            self.write_json(200, bench_cpu(text, int(rounds)))
             return
 
         validation_error = validate_ticket(body)
@@ -222,6 +234,39 @@ def sort_ticket(ticket_id: str, raw_message: str) -> dict[str, Any]:
         "agent_summary": make_summary(case_type, amount),
         "human_review_required": case_type == "phishing_or_social_engineering" or severity == "critical",
         "confidence": round(confidence, 2),
+    }
+
+
+def bench_json(body: Any) -> dict[str, Any]:
+    items = body.get("items", []) if isinstance(body, dict) else []
+    items = items if isinstance(items, list) else []
+    active_count = 0
+    amount_total = 0.0
+    label_checksum = 2166136261
+
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        if item.get("active") is True:
+            active_count += 1
+        if isinstance(item.get("amount"), int | float):
+            amount_total += item["amount"]
+        if isinstance(item.get("label"), str):
+            label_checksum = checksum(item["label"], 1, label_checksum)
+
+    return {
+        "item_count": len(items),
+        "active_count": active_count,
+        "amount_total": round(amount_total, 2),
+        "label_checksum": label_checksum,
+    }
+
+
+def bench_cpu(text: str, rounds: int) -> dict[str, Any]:
+    return {
+        "bytes": len(text),
+        "rounds": rounds,
+        "checksum": checksum(text, rounds, 2166136261),
     }
 
 
@@ -297,6 +342,17 @@ def score(message: str, words: list[str]) -> int:
 
 def has_any(message: str, words: list[str]) -> bool:
     return any(word in message for word in words)
+
+
+def checksum(text: str, rounds: int, seed: int) -> int:
+    hash_value = seed & 0xFFFFFFFF
+    encoded = text.encode()
+    for round_index in range(rounds):
+        for byte in encoded:
+            hash_value ^= byte
+            hash_value = (hash_value * 16777619) & 0xFFFFFFFF
+        hash_value ^= round_index
+    return hash_value & 0xFFFFFFFF
 
 
 def main() -> None:

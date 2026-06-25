@@ -22,6 +22,15 @@ The script starts each available implementation on a different local port:
 - Go: `3002`
 - Python: `3003`
 
+## Workloads
+
+The benchmark measures several API shapes so the result shows which runtime works well for which objective:
+
+- `health-routing`: `GET /health`, minimal routing plus tiny JSON response.
+- `ticket-classify`: `POST /sort-ticket`, the actual CRM classifier workload.
+- `json-shape`: `POST /bench/json`, parses a structured JSON payload, aggregates fields, and serializes a summary.
+- `cpu-checksum`: `POST /bench/cpu`, runs a deterministic string checksum loop to show CPU-bound behavior.
+
 It benchmarks one implementation at a time:
 
 1. Start one local server.
@@ -55,7 +64,7 @@ Defaults:
 
 ## Notes
 
-- The script disables Bun's local rate limiter with `QUEUESTORM_DISABLE_RATE_LIMIT=1` so the benchmark measures classifier/server throughput instead of intentionally producing `429` responses.
+- The script disables Bun's local rate limiter with `QUEUESTORM_DISABLE_RATE_LIMIT=1` so the benchmark measures server/workload throughput instead of intentionally producing `429` responses.
 - Missing runtimes are skipped. For example, if Go is not installed, the Go benchmark will be reported as skipped.
 - The Python comparison version uses only the standard library, so it does not require FastAPI, Flask, or Uvicorn.
 - Do not run this script against the deployed Vercel URL.

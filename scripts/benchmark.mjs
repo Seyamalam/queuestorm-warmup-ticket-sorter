@@ -49,6 +49,50 @@ const sampleTickets = [
   'App crashed when I opened it',
 ]
 
+const jsonItems = Array.from({ length: 24 }, (_, index) => ({
+  id: index + 1,
+  amount: 100 + index * 3.25,
+  label: `merchant-${index % 6}-invoice-${index}`,
+  active: index % 3 !== 0,
+}))
+
+const cpuText = Array.from({ length: 64 }, (_, index) => `QueueStorm-${index}-ভুল-OTP-refund`).join('|')
+
+const workloads = [
+  {
+    name: 'health-routing',
+    objective: 'Minimal routing and JSON response',
+    request: (port) => fetch(`http://127.0.0.1:${port}/health`),
+  },
+  {
+    name: 'ticket-classify',
+    objective: 'Realistic CRM classification',
+    request: (port, index) => postJson(port, '/sort-ticket', {
+      ticket_id: `T-BENCH-${index}`,
+      channel: 'app',
+      locale: 'en',
+      message: sampleTickets[index % sampleTickets.length],
+    }),
+  },
+  {
+    name: 'json-shape',
+    objective: 'JSON parse, aggregate, serialize',
+    request: (port, index) => postJson(port, '/bench/json', {
+      batch_id: `B-${index}`,
+      source: 'benchmark',
+      items: jsonItems,
+    }),
+  },
+  {
+    name: 'cpu-checksum',
+    objective: 'CPU-bound string checksum',
+    request: (port, index) => postJson(port, '/bench/cpu', {
+      text: `${cpuText}-${index % 17}`,
+      rounds: 400,
+    }),
+  },
+]
+
 const results = []
 
 for (const implementation of implementations) {
@@ -73,9 +117,11 @@ for (const implementation of implementations) {
   try {
     console.log(`\nStarting ${implementation.name} on port ${implementation.port}`)
     await waitForHealth(implementation.port)
-    await runWarmup(implementation.port)
-    const result = await runBenchmark(implementation, child)
-    results.push(result)
+    for (const workload of workloads) {
+      await runWarmup(implementation.port, workload)
+      const result = await runBenchmark(implementation, child, workload)
+      results.push(result)
+    }
   } finally {
     await stopServer(child, implementation.name, implementation.port)
   }
@@ -87,13 +133,18 @@ if (results.length === 0) {
 }
 
 console.log('\nBenchmark results')
-const baseline = results[0]
+const baselineByWorkload = new Map()
 console.table(
   results.map((result, index) => {
-    const previous = results[index - 1]
+    if (!baselineByWorkload.has(result.workload)) {
+      baselineByWorkload.set(result.workload, result)
+    }
+    const baseline = baselineByWorkload.get(result.workload)
+    const previous = previousForWorkload(results, result.workload, index)
 
     return {
       implementation: result.name,
+      workload: result.workload,
       requests: result.requests,
       concurrency: result.concurrency,
       ok: result.ok,
@@ -111,13 +162,14 @@ console.table(
   })
 )
 
-async function runWarmup(port) {
+async function runWarmup(port, workload) {
   for (let index = 0; index < warmupRequests; index += 1) {
-    await postTicket(port, index)
+    await workload.request(port, index)
   }
 }
 
-async function runBenchmark(implementation, child) {
+async function runBenchmark(implementation, child, workload) {
+  console.log(`Benchmarking ${implementation.name} :: ${workload.name} (${workload.objective})`)
   const latencies = []
   let next = 0
   let ok = 0
@@ -140,7 +192,7 @@ async function runBenchmark(implementation, child) {
       const started = performance.now()
 
       try {
-        const response = await postTicket(implementation.port, index)
+        const response = await workload.request(implementation.port, index)
         if (response.status === 200) {
           ok += 1
         } else {
@@ -163,6 +215,7 @@ async function runBenchmark(implementation, child) {
 
   return {
     name: implementation.name,
+    workload: workload.name,
     requests: totalRequests,
     concurrency,
     ok,
@@ -185,16 +238,11 @@ async function runBenchmark(implementation, child) {
   }
 }
 
-async function postTicket(port, index) {
-  return fetch(`http://127.0.0.1:${port}/sort-ticket`, {
+async function postJson(port, path, body) {
+  return fetch(`http://127.0.0.1:${port}${path}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      ticket_id: `T-BENCH-${index}`,
-      channel: 'app',
-      locale: 'en',
-      message: sampleTickets[index % sampleTickets.length],
-    }),
+    body: JSON.stringify(body),
   })
 }
 
@@ -226,6 +274,16 @@ function percentile(values, target) {
   }
 
   return values[Math.min(values.length - 1, Math.floor(values.length * target))]
+}
+
+function previousForWorkload(results, workload, currentIndex) {
+  for (let index = currentIndex - 1; index >= 0; index -= 1) {
+    if (results[index].workload === workload) {
+      return results[index]
+    }
+  }
+
+  return null
 }
 
 async function stopServer(child, name, port) {

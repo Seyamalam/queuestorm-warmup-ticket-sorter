@@ -6,6 +6,7 @@ use axum::{
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::{env, net::SocketAddr};
 use tower_http::limit::RequestBodyLimitLayer;
 
@@ -49,6 +50,8 @@ async fn main() {
     let app = Router::new()
         .route("/health", get(health))
         .route("/sort-ticket", post(sort_ticket_handler))
+        .route("/bench/json", post(bench_json_handler))
+        .route("/bench/cpu", post(bench_cpu_handler))
         .fallback(not_found)
         .layer(RequestBodyLimitLayer::new(8 * 1024))
         .layer(DefaultBodyLimit::max(8 * 1024));
@@ -89,6 +92,52 @@ async fn sort_ticket_handler(
         ticket.ticket_id.as_deref().unwrap(),
         ticket.message.as_deref().unwrap(),
     ))
+    .into_response()
+}
+
+async fn bench_json_handler(
+    payload: Result<Json<Value>, axum::extract::rejection::JsonRejection>,
+) -> impl IntoResponse {
+    let Json(body) = match payload {
+        Ok(payload) => payload,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({ "error": "Request body must be valid JSON." })),
+            )
+                .into_response()
+        }
+    };
+
+    Json(bench_json(&body)).into_response()
+}
+
+async fn bench_cpu_handler(
+    payload: Result<Json<Value>, axum::extract::rejection::JsonRejection>,
+) -> impl IntoResponse {
+    let Json(body) = match payload {
+        Ok(payload) => payload,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({ "error": "Request body must be valid JSON." })),
+            )
+                .into_response()
+        }
+    };
+
+    let text = body.get("text").and_then(Value::as_str).unwrap_or("");
+    let rounds = body
+        .get("rounds")
+        .and_then(Value::as_u64)
+        .unwrap_or(1_000)
+        .clamp(1, 10_000) as u32;
+
+    Json(serde_json::json!({
+        "bytes": text.len(),
+        "rounds": rounds,
+        "checksum": checksum(text, rounds, 2166136261),
+    }))
     .into_response()
 }
 
@@ -144,6 +193,36 @@ fn sort_ticket(ticket_id: &str, message: &str) -> TicketResponse {
             || severity == "critical",
         confidence: round_confidence(classification.confidence),
     }
+}
+
+fn bench_json(body: &Value) -> Value {
+    let items = body
+        .get("items")
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or(&[]);
+    let mut active_count = 0u64;
+    let mut amount_total = 0.0f64;
+    let mut label_checksum = 2166136261u32;
+
+    for item in items {
+        if item.get("active").and_then(Value::as_bool).unwrap_or(false) {
+            active_count += 1;
+        }
+        if let Some(amount) = item.get("amount").and_then(Value::as_f64) {
+            amount_total += amount;
+        }
+        if let Some(label) = item.get("label").and_then(Value::as_str) {
+            label_checksum = checksum(label, 1, label_checksum);
+        }
+    }
+
+    serde_json::json!({
+        "item_count": items.len(),
+        "active_count": active_count,
+        "amount_total": (amount_total * 100.0).round() / 100.0,
+        "label_checksum": label_checksum,
+    })
 }
 
 fn normalize(text: &str) -> String {
@@ -287,6 +366,18 @@ fn has_any(message: &str, words: &[&str]) -> bool {
 
 fn round_confidence(value: f64) -> f64 {
     (value * 100.0).round() / 100.0
+}
+
+fn checksum(text: &str, rounds: u32, seed: u32) -> u32 {
+    let mut hash = seed;
+    for round in 0..rounds {
+        for byte in text.as_bytes() {
+            hash ^= *byte as u32;
+            hash = hash.wrapping_mul(16_777_619);
+        }
+        hash ^= round;
+    }
+    hash
 }
 
 const CASE_KEYWORDS: &[(&str, &[&str])] = &[

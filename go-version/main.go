@@ -42,6 +42,8 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", health)
 	mux.HandleFunc("POST /sort-ticket", sortTicketHandler)
+	mux.HandleFunc("POST /bench/json", benchJSONHandler)
+	mux.HandleFunc("POST /bench/cpu", benchCPUHandler)
 	mux.HandleFunc("/", notFound)
 
 	server := &http.Server{
@@ -74,6 +76,38 @@ func sortTicketHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, sortTicket(ticket.TicketID, ticket.Message))
+}
+
+func benchJSONHandler(w http.ResponseWriter, r *http.Request) {
+	var body map[string]any
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&body); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Request body must be valid JSON."})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, benchJSON(body))
+}
+
+func benchCPUHandler(w http.ResponseWriter, r *http.Request) {
+	var body map[string]any
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&body); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Request body must be valid JSON."})
+		return
+	}
+
+	text, _ := body["text"].(string)
+	rounds := 1000
+	if value, ok := body["rounds"].(float64); ok {
+		rounds = max(1, minInt(10000, int(value)))
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"bytes":    len(text),
+		"rounds":   rounds,
+		"checksum": checksum(text, rounds, 2166136261),
+	})
 }
 
 func notFound(w http.ResponseWriter, _ *http.Request) {
@@ -116,6 +150,36 @@ func sortTicket(ticketID string, rawMessage string) TicketResponse {
 		AgentSummary:        makeSummary(classification.CaseType, amount, hasAmount),
 		HumanReviewRequired: classification.CaseType == "phishing_or_social_engineering" || severity == "critical",
 		Confidence:          roundConfidence(classification.Confidence),
+	}
+}
+
+func benchJSON(body map[string]any) map[string]any {
+	rawItems, _ := body["items"].([]any)
+	activeCount := 0
+	amountTotal := 0.0
+	labelChecksum := uint32(2166136261)
+
+	for _, rawItem := range rawItems {
+		item, ok := rawItem.(map[string]any)
+		if !ok {
+			continue
+		}
+		if active, _ := item["active"].(bool); active {
+			activeCount++
+		}
+		if amount, ok := item["amount"].(float64); ok {
+			amountTotal += amount
+		}
+		if label, ok := item["label"].(string); ok {
+			labelChecksum = checksum(label, 1, labelChecksum)
+		}
+	}
+
+	return map[string]any{
+		"item_count":     len(rawItems),
+		"active_count":   activeCount,
+		"amount_total":   float64(int(amountTotal*100+0.5)) / 100,
+		"label_checksum": labelChecksum,
 	}
 }
 
@@ -254,6 +318,18 @@ func roundConfidence(value float64) float64 {
 	return float64(int(value*100+0.5)) / 100
 }
 
+func checksum(text string, rounds int, seed uint32) uint32 {
+	hash := seed
+	for round := 0; round < rounds; round++ {
+		for index := 0; index < len(text); index++ {
+			hash ^= uint32(text[index])
+			hash *= 16777619
+		}
+		hash ^= uint32(round)
+	}
+	return hash
+}
+
 func contains(values []string, needle string) bool {
 	for _, value := range values {
 		if value == needle {
@@ -278,6 +354,20 @@ func limitBody(next http.Handler, maxBytes int64) http.Handler {
 
 func min(a float64, b float64) float64 {
 	if a < b {
+		return a
+	}
+	return b
+}
+
+func minInt(a int, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func max(a int, b int) int {
+	if a > b {
 		return a
 	}
 	return b

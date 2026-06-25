@@ -234,6 +234,33 @@ app.post('/sort-ticket', async (c) => {
   return c.json(sortTicket(body as { ticket_id: string; message: string }))
 })
 
+app.post('/bench/json', async (c) => {
+  let body: unknown
+
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'Request body must be valid JSON.' }, 400)
+  }
+
+  return c.json(benchJson(body))
+})
+
+app.post('/bench/cpu', async (c) => {
+  let body: { text?: unknown; rounds?: unknown }
+
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'Request body must be valid JSON.' }, 400)
+  }
+
+  const text = typeof body.text === 'string' ? body.text : ''
+  const rounds = typeof body.rounds === 'number' ? Math.max(1, Math.min(10_000, body.rounds)) : 1_000
+
+  return c.json(benchCpu(text, rounds))
+})
+
 app.notFound((c) => c.json({ error: 'Not found.' }, 404))
 
 app.onError((error, c) => {
@@ -337,6 +364,48 @@ export function sortTicket(ticket: { ticket_id: string; message: string }): Tick
     agent_summary: makeSummary(caseType, amount),
     human_review_required: caseType === 'phishing_or_social_engineering' || severity === 'critical',
     confidence: roundConfidence(confidence),
+  }
+}
+
+export function benchJson(body: unknown): {
+  item_count: number
+  active_count: number
+  amount_total: number
+  label_checksum: number
+} {
+  const items = Array.isArray((body as { items?: unknown }).items)
+    ? ((body as { items: unknown[] }).items)
+    : []
+  let activeCount = 0
+  let amountTotal = 0
+  let labelChecksum = 2166136261
+
+  for (const item of items) {
+    const record = item as { active?: unknown; amount?: unknown; label?: unknown }
+    if (record.active === true) {
+      activeCount += 1
+    }
+    if (typeof record.amount === 'number' && Number.isFinite(record.amount)) {
+      amountTotal += record.amount
+    }
+    if (typeof record.label === 'string') {
+      labelChecksum = checksum(record.label, 1, labelChecksum)
+    }
+  }
+
+  return {
+    item_count: items.length,
+    active_count: activeCount,
+    amount_total: Math.round(amountTotal * 100) / 100,
+    label_checksum: labelChecksum >>> 0,
+  }
+}
+
+export function benchCpu(text: string, rounds: number): { bytes: number; rounds: number; checksum: number } {
+  return {
+    bytes: text.length,
+    rounds,
+    checksum: checksum(text, rounds, 2166136261),
   }
 }
 
@@ -482,6 +551,20 @@ export function makeSummary(caseType: CaseType, amount: number | null): string {
 
 function roundConfidence(confidence: number): number {
   return Math.round(confidence * 100) / 100
+}
+
+function checksum(text: string, rounds: number, seed: number): number {
+  let hash = seed >>> 0
+
+  for (let round = 0; round < rounds; round += 1) {
+    for (let index = 0; index < text.length; index += 1) {
+      hash ^= text.charCodeAt(index)
+      hash = Math.imul(hash, 16777619) >>> 0
+    }
+    hash ^= round
+  }
+
+  return hash >>> 0
 }
 
 export default app
