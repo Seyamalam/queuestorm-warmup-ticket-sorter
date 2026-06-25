@@ -43,6 +43,25 @@ The in-memory rate limiter is a lightweight backstop for a busy API. On multi-in
 - The test suite includes a throughput sanity check that classifies 500 tickets in under 1 second on the local machine.
 - Runtime limits are set below the task requirements: `/health` is tested under the 10 second budget and all requests time out after 25 seconds, below the 30 second `/sort-ticket` limit.
 
+### Local Heavy Benchmark
+
+These numbers are from a local machine and benchmark `/sort-ticket` only. They are useful for comparing implementations in this repository, not for estimating Vercel free-tier capacity.
+
+Command:
+
+```bash
+REQUESTS=50000 CONCURRENCY=250 WARMUP_REQUESTS=1000 npm run benchmark
+```
+
+| Implementation | Requests | Concurrency | OK | Errors | RPS | vs Bun | vs Previous | Avg | P50 | P95 | P99 | Peak RSS | End RSS |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Bun + Hono | 50,000 | 250 | 50,000 | 0 | 20,200.9 | +0.0% | baseline | 12.35 ms | 11.16 ms | 17.11 ms | 25.96 ms | 72.5 MB | 72.5 MB |
+| Rust + Axum | 50,000 | 250 | 50,000 | 0 | 23,092.9 | +14.3% | +14.3% | 10.81 ms | 9.86 ms | 14.77 ms | 19.15 ms | 23.1 MB | 23.1 MB |
+| Go stdlib | 50,000 | 250 | 50,000 | 0 | 23,967.0 | +18.6% | +3.8% | 10.42 ms | 9.44 ms | 14.29 ms | 16.90 ms | 71.5 MB | 71.5 MB |
+| Python stdlib | 50,000 | 250 | 49,799 | 201 | 6,275.0 | -68.9% | -73.8% | 38.11 ms | 0.65 ms | 4.29 ms | 121.10 ms | 26.0 MB | 25.9 MB |
+
+The Python standard-library comparison server showed errors at this stress level. The deployed implementation is Bun + Hono.
+
 ## Security
 
 - No secrets are stored in the repository.
