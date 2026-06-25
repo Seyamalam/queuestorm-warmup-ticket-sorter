@@ -6,3 +6,5 @@ node_modules
 *.log
 target
 go-version/queuestorm-go
+__pycache__
+*.pyc
