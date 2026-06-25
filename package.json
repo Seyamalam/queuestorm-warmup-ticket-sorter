@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "bun run --hot src/index.ts",
     "start": "bun run src/index.ts",
+    "benchmark": "node scripts/benchmark.mjs",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },

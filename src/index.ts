@@ -247,6 +247,11 @@ export function clearRateLimitStore(): void {
 
 function rateLimit(options: { limit: number; windowMs: number; namespace: string }): MiddlewareHandler {
   return async (c, next) => {
+    if (process.env.QUEUESTORM_DISABLE_RATE_LIMIT === '1') {
+      await next()
+      return
+    }
+
     const now = Date.now()
     const key = `${options.namespace}:${clientIdentifier(c.req.raw)}:${c.req.path}`
     const current = rateLimitStore.get(key)

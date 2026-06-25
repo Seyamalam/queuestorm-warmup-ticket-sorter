@@ -102,6 +102,7 @@ Detailed setup guides:
 - [Local setup](docs/local-setup.md)
 - [Docker setup](docs/docker.md)
 - [Vercel hosting](docs/vercel.md)
+- [Local benchmarks](docs/benchmarks.md)
 
 Quick start with Bun:
 
