@@ -62,6 +62,24 @@ REQUESTS=50000 CONCURRENCY=250 WARMUP_REQUESTS=1000 npm run benchmark
 
 The Python standard-library comparison server showed errors at this stress level. The deployed implementation is Bun + Hono.
 
+### Combined Workload Averages
+
+These numbers average all four local benchmark workloads together: `health-routing`, `ticket-classify`, `json-shape`, and `cpu-checksum`. Actix Web is included in the benchmark suite, but it is not in this local table because crates.io timed out while downloading its dependencies on this machine.
+
+Command:
+
+```bash
+IMPLEMENTATIONS=bun-hono,rust-axum,go-stdlib,node-express,python-stdlib REQUESTS=500 CONCURRENCY=25 WARMUP_REQUESTS=50 npm run benchmark
+```
+
+| Implementation | Workloads | Total Requests | Total OK | Errors | Avg RPS | vs Bun | vs Previous | Avg Latency | Avg P95 | Avg P99 | Max Peak RSS |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Bun + Hono | 4 | 2,000 | 2,000 | 0 | 12,033.5 | +0.0% | baseline | 5.99 ms | 11.52 ms | 12.07 ms | 64.1 MB |
+| Rust + Axum | 4 | 2,000 | 2,000 | 0 | 20,278.2 | +68.5% | +68.5% | 1.28 ms | 2.80 ms | 3.26 ms | 7.1 MB |
+| Go stdlib | 4 | 2,000 | 2,000 | 0 | 20,708.4 | +72.1% | +2.1% | 1.45 ms | 3.30 ms | 3.76 ms | 58.7 MB |
+| Node.js + Express | 4 | 2,000 | 2,000 | 0 | 16,970.2 | +41.0% | -18.1% | 5.36 ms | 10.42 ms | 11.58 ms | 152.3 MB |
+| Python stdlib | 4 | 2,000 | 1,972 | 28 | 2,214.3 | -81.6% | -87.0% | 224.89 ms | 2,147.23 ms | 2,240.71 ms | 23.9 MB |
+
 ## Security
 
 - No secrets are stored in the repository.

@@ -191,6 +191,30 @@ console.table(
   })
 )
 
+const overallResults = summarizeOverall(results)
+const overallBaseline = overallResults[0]
+console.log('\nOverall averages across workloads')
+console.table(
+  overallResults.map((result, index) => {
+    const previous = overallResults[index - 1]
+
+    return {
+      implementation: result.name,
+      workloads: result.workloads,
+      total_requests: result.totalRequests,
+      total_ok: result.totalOk,
+      total_errors: result.totalErrors,
+      avg_rps: result.avgRps.toFixed(1),
+      vs_bun: formatPercentDelta(result.avgRps, overallBaseline.avgRps),
+      vs_prev: previous ? formatPercentDelta(result.avgRps, previous.avgRps) : 'baseline',
+      avg_latency_ms: result.avgLatencyMs.toFixed(2),
+      avg_p95_ms: result.avgP95Ms.toFixed(2),
+      avg_p99_ms: result.avgP99Ms.toFixed(2),
+      max_peak_rss_mb: formatMb(result.maxPeakRssBytes),
+    }
+  })
+)
+
 async function runWarmup(port, workload) {
   for (let index = 0; index < warmupRequests; index += 1) {
     await workload.request(port, index)
@@ -317,6 +341,51 @@ function previousForWorkload(results, workload, currentIndex) {
   }
 
   return null
+}
+
+function summarizeOverall(results) {
+  const grouped = new Map()
+
+  for (const result of results) {
+    const current =
+      grouped.get(result.name) ??
+      {
+        name: result.name,
+        workloads: 0,
+        totalRequests: 0,
+        totalOk: 0,
+        totalErrors: 0,
+        rpsTotal: 0,
+        avgLatencyTotal: 0,
+        p95Total: 0,
+        p99Total: 0,
+        maxPeakRssBytes: 0,
+      }
+
+    current.workloads += 1
+    current.totalRequests += result.requests
+    current.totalOk += result.ok
+    current.totalErrors += result.errors
+    current.rpsTotal += result.rps
+    current.avgLatencyTotal += result.avgMs
+    current.p95Total += result.p95Ms
+    current.p99Total += result.p99Ms
+    current.maxPeakRssBytes = Math.max(current.maxPeakRssBytes, result.peakRssBytes)
+    grouped.set(result.name, current)
+  }
+
+  return [...grouped.values()].map((result) => ({
+    name: result.name,
+    workloads: result.workloads,
+    totalRequests: result.totalRequests,
+    totalOk: result.totalOk,
+    totalErrors: result.totalErrors,
+    avgRps: result.rpsTotal / result.workloads,
+    avgLatencyMs: result.avgLatencyTotal / result.workloads,
+    avgP95Ms: result.p95Total / result.workloads,
+    avgP99Ms: result.p99Total / result.workloads,
+    maxPeakRssBytes: result.maxPeakRssBytes,
+  }))
 }
 
 async function stopServer(child, name, port) {
