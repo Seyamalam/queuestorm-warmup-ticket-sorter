@@ -1,12 +1,14 @@
 # Benchmarking
 
-The deployed Bun + Hono app is the primary implementation. The `rust-version/`, `go-version/`, and `python-version/` folders are optional local comparison implementations and are not meant for deployment.
+The deployed Bun + Hono app is the primary implementation. The `rust-version/`, `actix-version/`, `go-version/`, `express-version/`, and `python-version/` folders are optional local comparison implementations and are not meant for deployment.
 
 ## Implementations
 
 - `bun-hono`: current production app, started with `bun run start`
 - `rust-axum`: Rust comparison server, started with Cargo
+- `rust-actix`: Rust Actix Web comparison server, started with Cargo
 - `go-stdlib`: Go comparison server, started with `go run`
+- `node-express`: Node.js + Express comparison server, started with npm
 - `python-stdlib`: Python comparison server, started with `python3`
 
 ## Run
@@ -21,6 +23,8 @@ The script starts each available implementation on a different local port:
 - Rust: `3001`
 - Go: `3002`
 - Python: `3003`
+- Rust Actix: `3004`
+- Node Express: `3005`
 
 ## Workloads
 
@@ -56,16 +60,24 @@ The output table includes:
 REQUESTS=2000 CONCURRENCY=50 WARMUP_REQUESTS=100 npm run benchmark
 ```
 
+Run only selected implementations:
+
+```bash
+IMPLEMENTATIONS=bun-hono,node-express REQUESTS=1000 CONCURRENCY=25 npm run benchmark
+```
+
 Defaults:
 
 - `REQUESTS=1000`
 - `CONCURRENCY=25`
 - `WARMUP_REQUESTS=50`
+- `IMPLEMENTATIONS` unset, which means all available implementations
 
 ## Notes
 
 - The script disables Bun's local rate limiter with `QUEUESTORM_DISABLE_RATE_LIMIT=1` so the benchmark measures server/workload throughput instead of intentionally producing `429` responses.
 - Missing runtimes are skipped. For example, if Go is not installed, the Go benchmark will be reported as skipped.
+- Targets that fail to start are skipped so one broken comparison server does not abort the full benchmark.
 - The Python comparison version uses only the standard library, so it does not require FastAPI, Flask, or Uvicorn.
 - Do not run this script against the deployed Vercel URL.
 - Memory measurements are approximate and OS-specific. They are best used for local comparisons on the same machine, not as absolute production sizing numbers.

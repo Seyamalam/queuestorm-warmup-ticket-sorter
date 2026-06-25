@@ -5,6 +5,12 @@ import { once } from 'node:events'
 const totalRequests = Number.parseInt(process.env.REQUESTS ?? '1000', 10)
 const concurrency = Number.parseInt(process.env.CONCURRENCY ?? '25', 10)
 const warmupRequests = Number.parseInt(process.env.WARMUP_REQUESTS ?? '50', 10)
+const selectedImplementations = new Set(
+  (process.env.IMPLEMENTATIONS ?? '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
+)
 
 const implementations = [
   {
@@ -24,11 +30,27 @@ const implementations = [
     env: {},
   },
   {
+    name: 'rust-actix',
+    port: 3004,
+    command: 'cargo',
+    args: ['run', '--release', '--manifest-path', 'actix-version/Cargo.toml'],
+    cwd: process.cwd(),
+    env: {},
+  },
+  {
     name: 'go-stdlib',
     port: 3002,
     command: 'go',
     args: ['run', '.'],
     cwd: new URL('../go-version/', import.meta.url).pathname,
+    env: {},
+  },
+  {
+    name: 'node-express',
+    port: 3005,
+    command: 'npm',
+    args: ['start', '--silent'],
+    cwd: new URL('../express-version/', import.meta.url).pathname,
     env: {},
   },
   {
@@ -40,6 +62,11 @@ const implementations = [
     env: {},
   },
 ]
+
+const activeImplementations =
+  selectedImplementations.size > 0
+    ? implementations.filter((implementation) => selectedImplementations.has(implementation.name))
+    : implementations
 
 const sampleTickets = [
   'I sent 3000 to wrong number',
@@ -95,7 +122,7 @@ const workloads = [
 
 const results = []
 
-for (const implementation of implementations) {
+for (const implementation of activeImplementations) {
   if (!(await commandExists(implementation.command))) {
     console.log(`Skipping ${implementation.name}: ${implementation.command} is not installed.`)
     continue
@@ -116,12 +143,14 @@ for (const implementation of implementations) {
 
   try {
     console.log(`\nStarting ${implementation.name} on port ${implementation.port}`)
-    await waitForHealth(implementation.port)
+    await waitForHealth(implementation.port, child)
     for (const workload of workloads) {
       await runWarmup(implementation.port, workload)
       const result = await runBenchmark(implementation, child, workload)
       results.push(result)
     }
+  } catch (error) {
+    console.log(`Skipping ${implementation.name}: ${error.message}`)
   } finally {
     await stopServer(child, implementation.name, implementation.port)
   }
@@ -246,9 +275,13 @@ async function postJson(port, path, body) {
   })
 }
 
-async function waitForHealth(port) {
+async function waitForHealth(port, child) {
   const deadline = Date.now() + 90_000
   while (Date.now() < deadline) {
+    if (child.exitCode !== null) {
+      throw new Error(`server exited before /health was ready`)
+    }
+
     try {
       const response = await fetch(`http://127.0.0.1:${port}/health`)
       if (response.status === 200) {

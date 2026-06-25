@@ -123,7 +123,7 @@ Detailed setup guides:
 - [Vercel hosting](docs/vercel.md)
 - [Local benchmarks](docs/benchmarks.md)
 
-The benchmark suite includes the deployed Bun + Hono implementation plus optional Rust, Go, and Python comparison servers. It can measure minimal routing, the real ticket classifier, JSON parse/serialize work, and CPU-bound checksum work.
+The benchmark suite includes the deployed Bun + Hono implementation plus optional Rust Axum, Rust Actix Web, Go, Node.js Express, and Python comparison servers. It can measure minimal routing, the real ticket classifier, JSON parse/serialize work, and CPU-bound checksum work.
 
 Quick start with Bun:
 
