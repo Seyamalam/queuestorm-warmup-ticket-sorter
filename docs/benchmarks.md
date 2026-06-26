@@ -1,10 +1,11 @@
 # Benchmarking
 
-The deployed Bun + Hono app is the primary implementation. The `rust-version/`, `actix-version/`, `go-version/`, `express-version/`, and `python-version/` folders are optional local comparison implementations and are not meant for deployment.
+The deployed Bun + Hono app is the primary implementation. The `elysia-version/`, `rust-version/`, `actix-version/`, `go-version/`, `express-version/`, and `python-version/` folders are optional local comparison implementations and are not meant for deployment.
 
 ## Implementations
 
 - `bun-hono`: current production app, started with `bun run start`
+- `bun-elysia`: Bun + Elysia comparison server, started with Bun
 - `rust-axum`: Rust comparison server, started with Cargo
 - `rust-actix`: Rust Actix Web comparison server, started with Cargo
 - `go-stdlib`: Go comparison server, started with `go run`
@@ -20,6 +21,7 @@ npm run benchmark
 The script starts each available implementation on a different local port:
 
 - Bun: `3000`
+- Bun Elysia: `3006`
 - Rust: `3001`
 - Go: `3002`
 - Python: `3003`
@@ -63,7 +65,7 @@ REQUESTS=2000 CONCURRENCY=50 WARMUP_REQUESTS=100 npm run benchmark
 Run only selected implementations:
 
 ```bash
-IMPLEMENTATIONS=bun-hono,node-express REQUESTS=1000 CONCURRENCY=25 npm run benchmark
+IMPLEMENTATIONS=bun-hono,bun-elysia,node-express REQUESTS=1000 CONCURRENCY=25 npm run benchmark
 ```
 
 Defaults:

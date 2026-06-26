@@ -1,0 +1,15 @@
+{
+  "name": "queuestorm-elysia-comparison",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun run server.ts"
+  },
+  "dependencies": {
+    "elysia": "^1.4.16"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.3"
+  }
+}

@@ -22,6 +22,14 @@ const implementations = [
     env: { QUEUESTORM_DISABLE_RATE_LIMIT: '1' },
   },
   {
+    name: 'bun-elysia',
+    port: 3006,
+    command: 'bun',
+    args: ['run', 'start'],
+    cwd: new URL('../elysia-version/', import.meta.url).pathname,
+    env: {},
+  },
+  {
     name: 'rust-axum',
     port: 3001,
     command: 'cargo',
