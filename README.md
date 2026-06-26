@@ -62,33 +62,34 @@ REQUESTS=50000 CONCURRENCY=250 WARMUP_REQUESTS=1000 npm run benchmark
 
 The Python standard-library comparison server showed errors at this stress level. The deployed implementation is Bun + Hono.
 
-### Combined Workload Averages
+### Heavy Combined Workload Averages
 
 These numbers average all four local benchmark workloads together: `health-routing`, `ticket-classify`, `json-shape`, and `cpu-checksum`. Actix Web is also included in the benchmark suite; if dependency fetching is slow, the repository includes Cargo sparse-registry config under `.cargo/config.toml`.
+
+The Python stdlib comparison server was excluded from this heavy combined table because the full run stalled on the CPU-bound checksum workload at this load. It remains in the benchmark suite for lighter comparisons.
 
 Command:
 
 ```bash
-REQUESTS=500 CONCURRENCY=25 WARMUP_REQUESTS=50 npm run benchmark
+IMPLEMENTATIONS=bun-hono,bun-elysia,rust-axum,rust-actix,go-stdlib,node-express REQUESTS=50000 CONCURRENCY=250 WARMUP_REQUESTS=1000 npm run benchmark
 ```
 
 | Implementation | Workloads | Total Requests | Total OK | Errors | Avg RPS | vs Bun | vs Previous | Avg Latency | Avg P95 | Avg P99 | Max Peak RSS |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Bun + Hono | 4 | 2,000 | 2,000 | 0 | 11,698.2 | +0.0% | baseline | 6.03 ms | 11.56 ms | 12.24 ms | 63.7 MB |
-| Bun + Elysia | 4 | 2,000 | 2,000 | 0 | 17,229.2 | +47.3% | +47.3% | 5.62 ms | 11.86 ms | 12.71 ms | 88.0 MB |
-| Rust + Axum | 4 | 2,000 | 2,000 | 0 | 19,018.2 | +62.6% | +10.4% | 1.38 ms | 3.38 ms | 3.65 ms | 6.8 MB |
-| Rust + Actix Web | 4 | 2,000 | 2,000 | 0 | 21,835.0 | +86.7% | +14.8% | 1.19 ms | 3.41 ms | 3.69 ms | 8.7 MB |
-| Go stdlib | 4 | 2,000 | 2,000 | 0 | 22,294.6 | +90.6% | +2.1% | 1.46 ms | 2.96 ms | 4.34 ms | 58.4 MB |
-| Node.js + Express | 4 | 2,000 | 2,000 | 0 | 17,140.8 | +46.5% | -23.1% | 5.35 ms | 10.46 ms | 12.20 ms | 152.3 MB |
-| Python stdlib | 4 | 2,000 | 1,974 | 26 | 2,262.0 | -80.7% | -86.8% | 229.23 ms | 1,962.31 ms | 2,321.22 ms | 24.2 MB |
+| Bun + Hono | 4 | 200,000 | 200,000 | 0 | 20,828.0 | +0.0% | baseline | 56.69 ms | 61.29 ms | 70.41 ms | 82.0 MB |
+| Bun + Elysia | 4 | 200,000 | 200,000 | 0 | 24,771.1 | +18.9% | +18.9% | 55.02 ms | 58.90 ms | 61.56 ms | 119.9 MB |
+| Rust + Axum | 4 | 200,000 | 200,000 | 0 | 27,821.8 | +33.6% | +12.3% | 10.48 ms | 15.04 ms | 17.29 ms | 26.6 MB |
+| Rust + Actix Web | 4 | 200,000 | 200,000 | 0 | 27,914.4 | +34.0% | +0.3% | 10.41 ms | 14.93 ms | 16.95 ms | 24.1 MB |
+| Go stdlib | 4 | 200,000 | 200,000 | 0 | 27,071.1 | +30.0% | -3.0% | 10.72 ms | 15.71 ms | 18.57 ms | 75.5 MB |
+| Node.js + Express | 4 | 200,000 | 200,000 | 0 | 23,582.2 | +13.2% | -12.9% | 52.30 ms | 55.70 ms | 73.14 ms | 232.2 MB |
 
 ### Result Summary
 
-- **Best overall local throughput:** Go stdlib and Rust Actix Web are the fastest in the combined workload average. Go leads slightly on average RPS, while both Rust servers use far less memory.
-- **Best memory footprint:** Rust Axum is the clear winner in this local run, peaking at 6.8 MB across the combined workloads, with Actix Web close behind at 8.7 MB.
+- **Best overall local throughput:** Rust Actix Web and Rust Axum are the fastest in the heavy combined workload average, with Go close behind.
+- **Best memory footprint:** Rust Actix Web and Rust Axum are the clear winners in this heavy local run, peaking at 24.1 MB and 26.6 MB respectively.
 - **Best CPU-bound behavior:** Rust and Go pull far ahead on `cpu-checksum`, which is expected because the workload is dominated by tight string/number loops rather than framework routing.
-- **Best JavaScript comparison:** Bun + Elysia and Node.js + Express are nearly tied on average RPS in this synthetic local run, but Elysia uses much less memory. Bun + Hono remains the deployed app because it is already complete, simple, fast enough, and fits the Vercel workflow.
-- **Python stdlib limitation:** The Python comparison is intentionally dependency-free and uses `ThreadingHTTPServer`, which is not a production high-concurrency server. Its tail latency and errors under stress show why a real Python deployment would use something like Uvicorn, Granian, or another production ASGI/WSGI server.
+- **Best JavaScript comparison:** Bun + Elysia leads the JavaScript group on average RPS in the heavy run. Node.js + Express is competitive on throughput but uses the most memory. Bun + Hono remains the deployed app because it is already complete, simple, fast enough, and fits the Vercel workflow.
+- **Python stdlib limitation:** The Python comparison is intentionally dependency-free and uses `ThreadingHTTPServer`, which is not a production high-concurrency server. It did not complete the heavy CPU-bound run in practical time, which is why the heavy table excludes it.
 - **What this means for the hackathon:** Bun + Hono is more than fast enough for the required API. The comparison implementations are useful learning artifacts, but they are not needed for the deployed submission.
 
 Benchmark caveats:
